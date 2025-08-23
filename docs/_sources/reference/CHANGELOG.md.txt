@@ -7,7 +7,7 @@ and this project somewhat adheres to [Semantic Versioning](https://semver.org/sp
 ## [Unreleased]
 ### Fixed
 - Importing tileset metatiles from Advance Map 1.95 always used the primary tileset.
-- Map layouts exported from Advance Map 1.95 were sliced and placed incorrectly when imported.
+- Map layouts exported from Advance Map 1.95 could be sliced, placed incorrectly, or cut off when imported.
 - Map layout imports no longer fail when the Advance Map `.map` file size differs from the expected value.
 
 ## [6.2.0] - 2025-08-08
