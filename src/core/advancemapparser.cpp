@@ -47,7 +47,7 @@ Layout *AdvanceMapParser::parseLayout(const QString &filepath, bool *error, cons
     int numMetatiles = mapWidth * mapHeight;
     int expectedFileSize = 20 + (numBorderTiles * 2) + (numMetatiles * 2);
     if (in.length() != expectedFileSize) {
-        if (numBorderTiles == 0) {
+        if (in.length() > expectedFileSize && numBorderTiles == 0) {
             int expectedWithoutBorder = 20 + (numMetatiles * 2);
             if (in.length() >= expectedWithoutBorder + 4) {
                 int borderWidthLE = static_cast<unsigned char>(in.at(in.length() - 4)) |
@@ -57,18 +57,18 @@ Layout *AdvanceMapParser::parseLayout(const QString &filepath, bool *error, cons
                 numBorderTiles = borderWidthLE * borderHeightLE;
                 mapDataOffset = 20; // map data follows header
                 expectedFileSize = expectedWithoutBorder + (numBorderTiles * 2) + 4;
-                if (in.length() == expectedFileSize) {
+                if (in.length() >= expectedFileSize) {
                     borderWidth = borderWidthLE;
                     borderHeight = borderHeightLE;
                 }
             }
         }
-        if (in.length() != expectedFileSize) {
+        if (in.length() < expectedFileSize) {
             *error = true;
-            logError(QString(".map file is an unexpected size. Expected %1 bytes, but it has %2 bytes.").arg(expectedFileSize).arg(in.length()));
+            logError(QString(".map file is an unexpected size. Expected at least %1 bytes, but it has %2 bytes.").arg(expectedFileSize).arg(in.length()));
             return nullptr;
-        }    }
-
+        }
+    }
     Blockdata blockdata;
      int mapDataEnd = mapDataOffset + (numMetatiles * 2);
     for (int i = mapDataOffset; (i + 1) < mapDataEnd; i += 2) {
