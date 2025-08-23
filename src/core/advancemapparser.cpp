@@ -21,8 +21,9 @@ Layout *AdvanceMapParser::parseLayout(const QString &filepath, bool *error, cons
         return nullptr;
     }
 
-    int borderWidth = static_cast<unsigned char>(in.at(16)); // 0 in RSE .map files
-    int borderHeight = static_cast<unsigned char>(in.at(17)); // 0 in RSE .map files
+    // Border width/height are 0 in RSE .map files.
+    int borderWidth = static_cast<unsigned char>(in.at(16));
+    int borderHeight = static_cast<unsigned char>(in.at(17));
     int numBorderTiles = borderWidth * borderHeight; // 0 if RSE
 
     int mapDataOffset = 20 + (numBorderTiles * 2); // FRLG .map files store border metatile data after the header
@@ -46,20 +47,40 @@ Layout *AdvanceMapParser::parseLayout(const QString &filepath, bool *error, cons
     int numMetatiles = mapWidth * mapHeight;
     int expectedFileSize = 20 + (numBorderTiles * 2) + (numMetatiles * 2);
     if (in.length() != expectedFileSize) {
-        *error = true;
-        logError(QString(".map file is an unexpected size. Expected %1 bytes, but it has %2 bytes.").arg(expectedFileSize).arg(in.length()));
-        return nullptr;
-    }
+        if (numBorderTiles == 0) {
+            int expectedWithoutBorder = 20 + (numMetatiles * 2);
+            if (in.length() >= expectedWithoutBorder + 4) {
+                int borderWidthLE = static_cast<unsigned char>(in.at(in.length() - 4)) |
+                                    (static_cast<unsigned char>(in.at(in.length() - 3)) << 8);
+                int borderHeightLE = static_cast<unsigned char>(in.at(in.length() - 2)) |
+                                     (static_cast<unsigned char>(in.at(in.length() - 1)) << 8);
+                numBorderTiles = borderWidthLE * borderHeightLE;
+                mapDataOffset = 20; // map data follows header
+                expectedFileSize = expectedWithoutBorder + (numBorderTiles * 2) + 4;
+                if (in.length() == expectedFileSize) {
+                    borderWidth = borderWidthLE;
+                    borderHeight = borderHeightLE;
+                }
+            }
+        }
+        if (in.length() != expectedFileSize) {
+            *error = true;
+            logError(QString(".map file is an unexpected size. Expected %1 bytes, but it has %2 bytes.").arg(expectedFileSize).arg(in.length()));
+            return nullptr;
+        }    }
 
     Blockdata blockdata;
-    for (int i = mapDataOffset; (i + 1) < in.length(); i += 2) {
+     int mapDataEnd = mapDataOffset + (numMetatiles * 2);
+    for (int i = mapDataOffset; (i + 1) < mapDataEnd; i += 2) {
         uint16_t word = static_cast<uint16_t>((in[i] & 0xff) + ((in[i + 1] & 0xff) << 8));
         blockdata.append(word);
     }
 
     Blockdata border;
     if (numBorderTiles != 0) {
-        for (int i = 20; (i + 1) < mapDataOffset; i += 2) {
+        int borderOffset = (mapDataOffset == 20) ? mapDataEnd : 20;
+        int borderEnd = borderOffset + (numBorderTiles * 2);
+        for (int i = borderOffset; (i + 1) < borderEnd; i += 2) {
             uint16_t word = static_cast<uint16_t>((in[i] & 0xff) + ((in[i + 1] & 0xff) << 8));
             border.append(word);
         }
