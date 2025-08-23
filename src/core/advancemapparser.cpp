@@ -45,32 +45,41 @@ Layout *AdvanceMapParser::parseLayout(const QString &filepath, bool *error, cons
                                  (static_cast<unsigned char>(in.at(15)) << 24);
 
     int numMetatiles = mapWidth * mapHeight;
-    int expectedFileSize = 20 + (numBorderTiles * 2) + (numMetatiles * 2);
-    if (in.length() != expectedFileSize) {
-        if (in.length() > expectedFileSize && numBorderTiles == 0) {
-            int expectedWithoutBorder = 20 + (numMetatiles * 2);
+    int baseMapSize = numMetatiles * 2;
+    int baseBorderSize = numBorderTiles * 2;
+    int expectedSingleSize = 20 + baseBorderSize + baseMapSize;
+    int expectedDoubleSize = expectedSingleSize + baseMapSize;
+    bool doubleMap = false;
+    if (in.length() != expectedSingleSize && in.length() != expectedDoubleSize) {
+        if (numBorderTiles == 0) {
+            int expectedWithoutBorder = 20 + baseMapSize;
             if (in.length() >= expectedWithoutBorder + 4) {
                 int borderWidthLE = static_cast<unsigned char>(in.at(in.length() - 4)) |
                                     (static_cast<unsigned char>(in.at(in.length() - 3)) << 8);
                 int borderHeightLE = static_cast<unsigned char>(in.at(in.length() - 2)) |
                                      (static_cast<unsigned char>(in.at(in.length() - 1)) << 8);
                 numBorderTiles = borderWidthLE * borderHeightLE;
+                baseBorderSize = numBorderTiles * 2;
                 mapDataOffset = 20; // map data follows header
-                expectedFileSize = expectedWithoutBorder + (numBorderTiles * 2) + 4;
-                if (in.length() >= expectedFileSize) {
+                expectedSingleSize = expectedWithoutBorder + baseBorderSize + 4;
+                expectedDoubleSize = expectedSingleSize + baseMapSize;
+                if (in.length() == expectedSingleSize || in.length() == expectedDoubleSize) {
                     borderWidth = borderWidthLE;
                     borderHeight = borderHeightLE;
                 }
             }
         }
-        if (in.length() < expectedFileSize) {
+        if (in.length() != expectedSingleSize && in.length() != expectedDoubleSize) {
             *error = true;
-            logError(QString(".map file is an unexpected size. Expected at least %1 bytes, but it has %2 bytes.").arg(expectedFileSize).arg(in.length()));
+            logError(QString(".map file is an unexpected size. Expected %1 or %2 bytes, but it has %3 bytes.")
+                        .arg(expectedSingleSize).arg(expectedDoubleSize).arg(in.length()));
             return nullptr;
         }
     }
+    doubleMap = (in.length() == expectedDoubleSize);
+
     Blockdata blockdata;
-     int mapDataEnd = mapDataOffset + (numMetatiles * 2);
+    int mapDataEnd = mapDataOffset + baseMapSize;
     for (int i = mapDataOffset; (i + 1) < mapDataEnd; i += 2) {
         uint16_t word = static_cast<uint16_t>((in[i] & 0xff) + ((in[i + 1] & 0xff) << 8));
         blockdata.append(word);
@@ -78,8 +87,8 @@ Layout *AdvanceMapParser::parseLayout(const QString &filepath, bool *error, cons
 
     Blockdata border;
     if (numBorderTiles != 0) {
-        int borderOffset = (mapDataOffset == 20) ? mapDataEnd : 20;
-        int borderEnd = borderOffset + (numBorderTiles * 2);
+        int borderOffset = (mapDataOffset == 20) ? mapDataOffset + baseMapSize * (doubleMap ? 2 : 1) : 20;
+        int borderEnd = borderOffset + baseBorderSize;
         for (int i = borderOffset; (i + 1) < borderEnd; i += 2) {
             uint16_t word = static_cast<uint16_t>((in[i] & 0xff) + ((in[i + 1] & 0xff) << 8));
             border.append(word);
