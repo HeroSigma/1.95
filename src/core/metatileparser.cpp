@@ -55,9 +55,12 @@ QList<Metatile*> MetatileParser::parse(QString filepath, bool* error, bool prima
     }
 
     int expectedFileSize = 4 + (metatileSize * numMetatiles) + (attrSize * numMetatiles) + 4;
-    if (in.length() != expectedFileSize) {
+    if (in.length() < expectedFileSize) {
         *error = true;
-        logError(QString(".bvd file is an unexpected size. Expected %1 bytes, but it has %2 bytes.").arg(expectedFileSize).arg(in.length()));
+        logError(
+            QString(".bvd file is too small. Expected at least %1 bytes, but it has %2 bytes.")
+                .arg(expectedFileSize)
+                .arg(in.length()));
         return {};
     }
 
