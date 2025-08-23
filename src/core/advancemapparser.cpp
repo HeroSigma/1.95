@@ -47,49 +47,71 @@ Layout *AdvanceMapParser::parseLayout(const QString &filepath, bool *error, cons
     int numMetatiles = mapWidth * mapHeight;
     int baseMapSize = numMetatiles * 2;
     int baseBorderSize = numBorderTiles * 2;
-    int expectedSingleSize = 20 + baseBorderSize + baseMapSize;
-    int expectedDoubleSize = expectedSingleSize + baseMapSize;
+    // Ensure the file has at least enough data for the header and one map.
+    int mapDataEnd = mapDataOffset + baseMapSize;
+    if (in.length() < mapDataEnd) {
+        *error = true;
+        logError(QString(".map file has too little data. Expected at least %1 bytes, but it has %2 bytes.")
+                    .arg(mapDataEnd).arg(in.length()));
+        return nullptr;
+    }
+
     bool doubleMap = false;
-    if (in.length() != expectedSingleSize && in.length() != expectedDoubleSize) {
-        if (numBorderTiles == 0) {
-            int expectedWithoutBorder = 20 + baseMapSize;
-            if (in.length() >= expectedWithoutBorder + 4) {
-                int borderWidthLE = static_cast<unsigned char>(in.at(in.length() - 4)) |
-                                    (static_cast<unsigned char>(in.at(in.length() - 3)) << 8);
-                int borderHeightLE = static_cast<unsigned char>(in.at(in.length() - 2)) |
-                                     (static_cast<unsigned char>(in.at(in.length() - 1)) << 8);
-                numBorderTiles = borderWidthLE * borderHeightLE;
-                baseBorderSize = numBorderTiles * 2;
-                mapDataOffset = 20; // map data follows header
-                expectedSingleSize = expectedWithoutBorder + baseBorderSize + 4;
-                expectedDoubleSize = expectedSingleSize + baseMapSize;
-                if (in.length() == expectedSingleSize || in.length() == expectedDoubleSize) {
-                    borderWidth = borderWidthLE;
-                    borderHeight = borderHeightLE;
+
+    // Handle the RSE format where border data is stored at the end of the file.
+    int rseBorderOffset = -1;
+    if (numBorderTiles == 0) {
+        // Map data follows the header, and border data (if present) is at the end
+        // with width/height stored in the last 4 bytes.
+        if (in.length() >= mapDataEnd + 4) {
+            int borderWidthLE = static_cast<unsigned char>(in.at(in.length() - 4)) |
+                                (static_cast<unsigned char>(in.at(in.length() - 3)) << 8);
+            int borderHeightLE = static_cast<unsigned char>(in.at(in.length() - 2)) |
+                                 (static_cast<unsigned char>(in.at(in.length() - 1)) << 8);
+            int rseNumBorderTiles = borderWidthLE * borderHeightLE;
+            int rseBorderSize = rseNumBorderTiles * 2;
+            int borderOffset = in.length() - (rseBorderSize + 4);
+            if (borderOffset >= mapDataOffset + baseMapSize) {
+                // At least one full map and border data exist.
+                if (borderOffset >= mapDataOffset + baseMapSize * 2) {
+                    doubleMap = true; // Ignore the second layout; use the first.
                 }
+                borderWidth = borderWidthLE;
+                borderHeight = borderHeightLE;
+                numBorderTiles = rseNumBorderTiles;
+                baseBorderSize = rseBorderSize;
+                rseBorderOffset = borderOffset;
             }
         }
-        if (in.length() != expectedSingleSize && in.length() != expectedDoubleSize) {
-            *error = true;
-            logError(QString(".map file is an unexpected size. Expected %1 or %2 bytes, but it has %3 bytes.")
-                        .arg(expectedSingleSize).arg(expectedDoubleSize).arg(in.length()));
-            return nullptr;
+    } else {
+        // FRLG format where border data comes right after the header.
+        if (in.length() >= mapDataOffset + baseMapSize * 2) {
+            doubleMap = true; // There is a second layout, ignore it.
         }
     }
-    doubleMap = (in.length() == expectedDoubleSize);
 
     Blockdata blockdata;
-    int mapDataEnd = mapDataOffset + baseMapSize;
-    for (int i = mapDataOffset; (i + 1) < mapDataEnd; i += 2) {
+    for (int i = mapDataOffset; (i + 1) < mapDataEnd && (i + 1) < in.length(); i += 2) {
         uint16_t word = static_cast<uint16_t>((in[i] & 0xff) + ((in[i + 1] & 0xff) << 8));
         blockdata.append(word);
     }
 
     Blockdata border;
     if (numBorderTiles != 0) {
-        int borderOffset = (mapDataOffset == 20) ? mapDataOffset + baseMapSize * (doubleMap ? 2 : 1) : 20;
+        int borderOffset;
+        if (mapDataOffset == 20) {
+            // Border is at the end of the file after the map data (RSE).
+            if (rseBorderOffset >= 0) {
+                borderOffset = rseBorderOffset;
+            } else {
+                borderOffset = mapDataOffset + baseMapSize * (doubleMap ? 2 : 1);
+            }
+        } else {
+            // Border data is directly after the header (FRLG).
+            borderOffset = 20;
+        }
         int borderEnd = borderOffset + baseBorderSize;
-        for (int i = borderOffset; (i + 1) < borderEnd; i += 2) {
+        for (int i = borderOffset; (i + 1) < borderEnd && (i + 1) < in.length(); i += 2) {
             uint16_t word = static_cast<uint16_t>((in[i] & 0xff) + ((in[i + 1] & 0xff) << 8));
             border.append(word);
         }
