@@ -5,7 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project somewhat adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).  The MAJOR version number is bumped when there are **"Breaking Changes"** in the pret projects. For more on this, see [the manual page on breaking changes](https://huderlem.github.io/porymap/manual/breaking-changes.html).
 
 ## [Unreleased]
-Nothing, yet.
+### Fixed
+- Importing tileset metatiles from Advance Map 1.95 always used the primary tileset.
+- Map layouts exported from Advance Map 1.95 were sliced and placed incorrectly when imported.
+- Map layout imports no longer fail when the Advance Map `.map` file size differs from the expected value.
 
 ## [6.2.0] - 2025-08-08
 ### Added

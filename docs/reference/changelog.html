@@ -137,7 +137,7 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../manual/tileset-editor.html#tools-menu">Tools Menu</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="../manual/tileset-editor.html#import-tiles-image">Import Tiles Image…</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../manual/tileset-editor.html#import-metatiles-from-advance-map-1-92">Import Metatiles from Advance Map 1.92…</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../manual/tileset-editor.html#import-metatiles-from-advance-map-1-92">Import Metatiles from Advance Map 1.92 or 1.95…</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../manual/tileset-editor.html#change-number-of-metatiles">Change Number of Metatiles</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../manual/tileset-editor.html#other-tools">Other Tools</a></li>
 </ul>
@@ -433,7 +433,14 @@
 and this project somewhat adheres to <a class="reference external" href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.  The MAJOR version number is bumped when there are <strong>“Breaking Changes”</strong> in the pret projects. For more on this, see <a class="reference external" href="https://huderlem.github.io/porymap/manual/breaking-changes.html">the manual page on breaking changes</a>.</p>
 <section id="unreleased">
 <h2><a class="reference external" href="https://github.com/huderlem/porymap/compare/6.2.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Link to this heading"></a></h2>
-<p>Nothing, yet.</p>
+<section id="fixed">
+<h3>Fixed<a class="headerlink" href="#fixed" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Importing tileset metatiles from Advance Map 1.95 always used the primary tileset.</p></li>
+<li><p>Map layouts exported from Advance Map 1.95 were sliced and placed incorrectly when imported.</p></li>
+<li><p>Map layout imports no longer fail when the Advance Map <code class="docutils literal notranslate"><span class="pre">.map</span></code> file size differs from the expected value.</p></li>
+</ul>
+</section>
 </section>
 <section id="id1">
 <h2><a class="reference external" href="https://github.com/huderlem/porymap/compare/6.1.0...6.2.0">6.2.0</a> - 2025-08-08<a class="headerlink" href="#id1" title="Link to this heading"></a></h2>
