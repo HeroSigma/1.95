@@ -110,11 +110,11 @@ The tile image is an indexed png of 8x8 pixel tiles, which are used to form
 metatiles in the tileset editor.
 
 
-Import Metatiles from Advance Map 1.92...
------------------------------------------
+Import Metatiles from Advance Map 1.92 or 1.95...
+-----------------------------------------------
 
 Helpful for users converting projects from binary hacks. 
-Metatile data exported from Advance Map 1.92 in a ``.bvd``` file can be imported
+Metatile data exported from Advance Map 1.92 or 1.95 in a ``.bvd`` file can be imported
 into porymap's tileset editor.
 This saves a lot of time since metatiles will not have to be defined from scratch.
 

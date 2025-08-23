@@ -174,11 +174,30 @@ QList<Metatile*> AdvanceMapParser::parseMetatiles(const QString &filepath, bool 
         return { };
     }
 
-    int expectedFileSize = 4 + (metatileSize * numMetatiles) + (attrSize * numMetatiles) + 4;
-    if (in.length() != expectedFileSize) {
+    int baseMetatileSize = metatileSize * numMetatiles;
+    int baseAttrSize = attrSize * numMetatiles;
+    int expectedSingleSize = baseMetatileSize + baseAttrSize + 8;
+    int expectedDoubleSize = (baseMetatileSize * 2) + (baseAttrSize * 2) + 8;
+    bool doubleTileset = false;
+    if (in.length() == expectedDoubleSize) {
+        doubleTileset = true;
+    } else if (in.length() != expectedSingleSize) {
         *error = true;
-        logError(QString(".bvd file is an unexpected size. Expected %1 bytes, but it has %2 bytes.").arg(expectedFileSize).arg(in.length()));
+        logError(QString(".bvd file is an unexpected size. Expected %1 or %2 bytes, but it has %3 bytes.").arg(expectedSingleSize).arg(expectedDoubleSize).arg(in.length()));
         return { };
+    }
+
+    int tilesOffset = 4;
+    int attrsOffset;
+    if (doubleTileset) {
+        if (primaryTileset) {
+            attrsOffset = 4 + (baseMetatileSize * 2);
+        } else {
+            tilesOffset += baseMetatileSize;
+            attrsOffset = 4 + (baseMetatileSize * 2) + baseAttrSize;
+        }
+    } else {
+        attrsOffset = 4 + baseMetatileSize;
     }
 
     QList<Metatile*> metatiles;
@@ -186,7 +205,7 @@ QList<Metatile*> AdvanceMapParser::parseMetatiles(const QString &filepath, bool 
         Metatile *metatile = new Metatile();
         QList<Tile> tiles;
         for (int j = 0; j < 8; j++) {
-            int metatileOffset = 4 + i * metatileSize + j * 2;
+            int metatileOffset = tilesOffset + i * metatileSize + j * 2;
             Tile tile(static_cast<uint16_t>(
                         static_cast<unsigned char>(in.at(metatileOffset)) |
                        (static_cast<unsigned char>(in.at(metatileOffset + 1)) << 8)));
@@ -201,7 +220,7 @@ QList<Metatile*> AdvanceMapParser::parseMetatiles(const QString &filepath, bool 
                 tiles.append(tile);
         }
 
-        int attrOffset = 4 + (numMetatiles * metatileSize) + (i * attrSize);
+        int attrOffset = attrsOffset + (i * attrSize);
         uint32_t attributes = 0;
         for (int j = 0; j < attrSize; j++)
             attributes |= static_cast<unsigned char>(in.at(attrOffset + j)) << (8 * j);
