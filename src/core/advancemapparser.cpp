@@ -59,6 +59,8 @@ Layout *AdvanceMapParser::parseLayout(const QString &filepath, bool *error, cons
                                 (static_cast<unsigned char>(in.at(in.length() - 3)) << 8);
             int borderHeightLE = static_cast<unsigned char>(in.at(in.length() - 2)) |
                                  (static_cast<unsigned char>(in.at(in.length() - 1)) << 8);
+            // Border data is stored at the end of RSE `.map` files. Use the
+            // trailing width/height values to calculate its size and offset.
             int detectedBorderTiles = borderWidthLE * borderHeightLE;
             int detectedBorderSize = detectedBorderTiles * 2;
             int possibleBorderOffset = in.length() - (detectedBorderSize + 4);
