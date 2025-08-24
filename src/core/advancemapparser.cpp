@@ -45,42 +45,62 @@ Layout *AdvanceMapParser::parseLayout(const QString &filepath, bool *error, cons
                                  (static_cast<unsigned char>(in.at(15)) << 24);
 
     int numMetatiles = mapWidth * mapHeight;
-    int expectedFileSize = 20 + (numBorderTiles * 2) + (numMetatiles * 2);
-    if (in.length() != expectedFileSize) {
-        if (numBorderTiles == 0) {
-            int expectedWithoutBorder = 20 + (numMetatiles * 2);
-            if (in.length() >= expectedWithoutBorder + 4) {
-                int borderWidthLE = static_cast<unsigned char>(in.at(in.length() - 4)) |
-                                    (static_cast<unsigned char>(in.at(in.length() - 3)) << 8);
-                int borderHeightLE = static_cast<unsigned char>(in.at(in.length() - 2)) |
-                                     (static_cast<unsigned char>(in.at(in.length() - 1)) << 8);
-                numBorderTiles = borderWidthLE * borderHeightLE;
-                mapDataOffset = 20; // map data follows header
-                expectedFileSize = expectedWithoutBorder + (numBorderTiles * 2) + 4;
-                if (in.length() == expectedFileSize) {
-                    borderWidth = borderWidthLE;
-                    borderHeight = borderHeightLE;
+    int baseMapSize = numMetatiles * 2;
+    int baseBorderSize = numBorderTiles * 2;
+
+    int borderOffset = -1;
+    int mapOffset = mapDataOffset;
+
+    if (numBorderTiles == 0) {
+        // RSE format where border data is stored at the end of the file with
+        // width/height in the last 4 bytes. Use the map layout immediately
+        // before the border data to avoid truncated imports.
+        if (in.length() >= mapDataOffset + baseMapSize + 4) {
+            int trailingWidth = static_cast<unsigned char>(in.at(in.length() - 4)) |
+                                (static_cast<unsigned char>(in.at(in.length() - 3)) << 8);
+            int trailingHeight = static_cast<unsigned char>(in.at(in.length() - 2)) |
+                                  (static_cast<unsigned char>(in.at(in.length() - 1)) << 8);
+            // Border data is stored at the end of RSE `.map` files. Use the
+            // trailing width/height values to calculate its size and location.
+            int candidateTiles = trailingWidth * trailingHeight;
+            int candidateSize = candidateTiles * 2;
+            int candidateOffset = in.length() - (candidateSize + 4);
+            if (candidateOffset >= mapDataOffset + baseMapSize) {
+                borderWidth = trailingWidth;
+                borderHeight = trailingHeight;
+                numBorderTiles = candidateTiles;
+                baseBorderSize = candidateSize;
+                borderOffset = candidateOffset;
+                mapOffset = borderOffset - baseMapSize;
+                if (mapOffset < mapDataOffset) {
+                    mapOffset = mapDataOffset;
                 }
             }
         }
-        if (in.length() != expectedFileSize) {
-            *error = true;
-            logError(QString(".map file is an unexpected size. Expected %1 bytes, but it has %2 bytes.").arg(expectedFileSize).arg(in.length()));
-            return nullptr;
-        }    }
+    } else {
+        // FRLG format where border data comes right after the header.
+        borderOffset = 20;
+    }
+
+    int mapDataEnd = mapOffset + baseMapSize;
+    if (in.length() < mapDataEnd) {
+        *error = true;
+        logError(QString(".map file has too little data. Expected at least %1 bytes, but it has %2 bytes.")
+                    .arg(mapDataEnd).arg(in.length()));
+        return nullptr;
+    }
 
     Blockdata blockdata;
-     int mapDataEnd = mapDataOffset + (numMetatiles * 2);
-    for (int i = mapDataOffset; (i + 1) < mapDataEnd; i += 2) {
+    for (int i = mapOffset; (i + 1) < mapDataEnd && (i + 1) < in.length(); i += 2) {
         uint16_t word = static_cast<uint16_t>((in[i] & 0xff) + ((in[i + 1] & 0xff) << 8));
         blockdata.append(word);
     }
 
     Blockdata border;
     if (numBorderTiles != 0) {
-        int borderOffset = (mapDataOffset == 20) ? mapDataEnd : 20;
-        int borderEnd = borderOffset + (numBorderTiles * 2);
-        for (int i = borderOffset; (i + 1) < borderEnd; i += 2) {
+        int borderStart = (borderOffset >= 0) ? borderOffset : mapOffset + baseMapSize;
+        int borderEnd = borderStart + baseBorderSize;
+        for (int i = borderStart; (i + 1) < borderEnd && (i + 1) < in.length(); i += 2) {
             uint16_t word = static_cast<uint16_t>((in[i] & 0xff) + ((in[i + 1] & 0xff) << 8));
             border.append(word);
         }
@@ -174,11 +194,30 @@ QList<Metatile*> AdvanceMapParser::parseMetatiles(const QString &filepath, bool 
         return { };
     }
 
-    int expectedFileSize = 4 + (metatileSize * numMetatiles) + (attrSize * numMetatiles) + 4;
-    if (in.length() != expectedFileSize) {
+    int baseMetatileSize = metatileSize * numMetatiles;
+    int baseAttrSize = attrSize * numMetatiles;
+    int expectedSingleSize = baseMetatileSize + baseAttrSize + 8;
+    int expectedDoubleSize = (baseMetatileSize * 2) + (baseAttrSize * 2) + 8;
+    bool doubleTileset = false;
+    if (in.length() == expectedDoubleSize) {
+        doubleTileset = true;
+    } else if (in.length() != expectedSingleSize) {
         *error = true;
-        logError(QString(".bvd file is an unexpected size. Expected %1 bytes, but it has %2 bytes.").arg(expectedFileSize).arg(in.length()));
+        logError(QString(".bvd file is an unexpected size. Expected %1 or %2 bytes, but it has %3 bytes.").arg(expectedSingleSize).arg(expectedDoubleSize).arg(in.length()));
         return { };
+    }
+
+    int tilesOffset = 4;
+    int attrsOffset;
+    if (doubleTileset) {
+        if (primaryTileset) {
+            attrsOffset = 4 + (baseMetatileSize * 2);
+        } else {
+            tilesOffset += baseMetatileSize;
+            attrsOffset = 4 + (baseMetatileSize * 2) + baseAttrSize;
+        }
+    } else {
+        attrsOffset = 4 + baseMetatileSize;
     }
 
     QList<Metatile*> metatiles;
@@ -186,7 +225,7 @@ QList<Metatile*> AdvanceMapParser::parseMetatiles(const QString &filepath, bool 
         Metatile *metatile = new Metatile();
         QList<Tile> tiles;
         for (int j = 0; j < 8; j++) {
-            int metatileOffset = 4 + i * metatileSize + j * 2;
+            int metatileOffset = tilesOffset + i * metatileSize + j * 2;
             Tile tile(static_cast<uint16_t>(
                         static_cast<unsigned char>(in.at(metatileOffset)) |
                        (static_cast<unsigned char>(in.at(metatileOffset + 1)) << 8)));
@@ -201,7 +240,7 @@ QList<Metatile*> AdvanceMapParser::parseMetatiles(const QString &filepath, bool 
                 tiles.append(tile);
         }
 
-        int attrOffset = 4 + (numMetatiles * metatileSize) + (i * attrSize);
+        int attrOffset = attrsOffset + (i * attrSize);
         uint32_t attributes = 0;
         for (int j = 0; j < attrSize; j++)
             attributes |= static_cast<unsigned char>(in.at(attrOffset + j)) << (8 * j);
