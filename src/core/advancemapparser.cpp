@@ -59,14 +59,14 @@ Layout *AdvanceMapParser::parseLayout(const QString &filepath, bool *error, cons
                                 (static_cast<unsigned char>(in.at(in.length() - 3)) << 8);
             int borderHeightLE = static_cast<unsigned char>(in.at(in.length() - 2)) |
                                  (static_cast<unsigned char>(in.at(in.length() - 1)) << 8);
-            int rseNumBorderTiles = borderWidthLE * borderHeightLE;
-            int rseBorderSize = rseNumBorderTiles * 2;
-            int possibleBorderOffset = in.length() - (rseBorderSize + 4);
+            int detectedBorderTiles = borderWidthLE * borderHeightLE;
+            int detectedBorderSize = detectedBorderTiles * 2;
+            int possibleBorderOffset = in.length() - (detectedBorderSize + 4);
             if (possibleBorderOffset >= mapDataOffset + baseMapSize) {
                 borderWidth = borderWidthLE;
                 borderHeight = borderHeightLE;
-                numBorderTiles = rseNumBorderTiles;
-                baseBorderSize = rseBorderSize;
+                numBorderTiles = detectedBorderTiles;
+                baseBorderSize = detectedBorderSize;
                 borderOffset = possibleBorderOffset;
                 mapOffset = borderOffset - baseMapSize;
                 if (mapOffset < mapDataOffset) {
