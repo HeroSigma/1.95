@@ -55,21 +55,21 @@ Layout *AdvanceMapParser::parseLayout(const QString &filepath, bool *error, cons
         // width/height in the last 4 bytes. Use the map layout immediately
         // before the border data to avoid truncated imports.
         if (in.length() >= mapDataOffset + baseMapSize + 4) {
-            int borderWidthLE = static_cast<unsigned char>(in.at(in.length() - 4)) |
+            int trailingWidth = static_cast<unsigned char>(in.at(in.length() - 4)) |
                                 (static_cast<unsigned char>(in.at(in.length() - 3)) << 8);
-            int borderHeightLE = static_cast<unsigned char>(in.at(in.length() - 2)) |
-                                 (static_cast<unsigned char>(in.at(in.length() - 1)) << 8);
+            int trailingHeight = static_cast<unsigned char>(in.at(in.length() - 2)) |
+                                  (static_cast<unsigned char>(in.at(in.length() - 1)) << 8);
             // Border data is stored at the end of RSE `.map` files. Use the
-            // trailing width/height values to calculate its size and offset.
-            int detectedBorderTiles = borderWidthLE * borderHeightLE;
-            int detectedBorderSize = detectedBorderTiles * 2;
-            int possibleBorderOffset = in.length() - (detectedBorderSize + 4);
-            if (possibleBorderOffset >= mapDataOffset + baseMapSize) {
-                borderWidth = borderWidthLE;
-                borderHeight = borderHeightLE;
-                numBorderTiles = detectedBorderTiles;
-                baseBorderSize = detectedBorderSize;
-                borderOffset = possibleBorderOffset;
+            // trailing width/height values to calculate its size and location.
+            int candidateTiles = trailingWidth * trailingHeight;
+            int candidateSize = candidateTiles * 2;
+            int candidateOffset = in.length() - (candidateSize + 4);
+            if (candidateOffset >= mapDataOffset + baseMapSize) {
+                borderWidth = trailingWidth;
+                borderHeight = trailingHeight;
+                numBorderTiles = candidateTiles;
+                baseBorderSize = candidateSize;
+                borderOffset = candidateOffset;
                 mapOffset = borderOffset - baseMapSize;
                 if (mapOffset < mapDataOffset) {
                     mapOffset = mapDataOffset;
